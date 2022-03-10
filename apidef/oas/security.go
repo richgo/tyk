@@ -44,13 +44,12 @@ func (s *OAS) fillToken(api apidef.APIDefinition) {
 func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 	authConfig := apidef.AuthConfig{DisableHeader: true}
 
-	if token := s.getTykTokenAuth(name); token != nil {
-		api.UseStandardAuth = token.Enabled
-		authConfig.UseCertificate = token.EnableClientCertificate
-		token.AuthSources.ExtractTo(&authConfig)
-		if token.Signature != nil {
-			token.Signature.ExtractTo(&authConfig)
-		}
+	token := s.getTykTokenAuth(name)
+	api.UseStandardAuth = token.Enabled
+	authConfig.UseCertificate = token.EnableClientCertificate
+	token.AuthSources.ExtractTo(&authConfig)
+	if token.Signature != nil {
+		token.Signature.ExtractTo(&authConfig)
 	}
 
 	s.extractApiKeySchemeTo(&authConfig, name)
@@ -71,14 +70,18 @@ func (s *OAS) extractSecurityTo(api *apidef.APIDefinition) {
 		api.AuthConfigs = make(map[string]apidef.AuthConfig)
 	}
 
-	if len(s.Security) == 0 {
+	if len(s.Security) == 0 || len(s.Components.SecuritySchemes) == 0 {
 		return
 	}
 
-	for name := range s.Security[0] {
-		switch s.Components.SecuritySchemes[name].Value.Type {
-		case apiKey:
-			s.extractTokenTo(api, name)
+	for schemeName := range s.getTykSecuritySchemes() {
+		if _, ok := s.Security[0][schemeName]; ok {
+			switch s.Components.SecuritySchemes[schemeName].Value.Type {
+			case apiKey:
+				if s.getTykTokenAuth(schemeName) != nil {
+					s.extractTokenTo(api, schemeName)
+				}
+			}
 		}
 	}
 }
@@ -123,18 +126,21 @@ func (s *OAS) fillApiKeyScheme(ac *apidef.AuthConfig) {
 	var loc, key string
 
 	switch {
-	case ref.Value.In == header || (ref.Value.In == "" && ac.AuthHeaderName != ""):
+	case ref.Value.In == header || (ref.Value.In == "" && !ac.DisableHeader):
 		loc = header
 		key = ac.AuthHeaderName
 		ac.AuthHeaderName = ""
-	case ref.Value.In == query || (ref.Value.In == "" && ac.ParamName != ""):
+		ac.DisableHeader = true
+	case ref.Value.In == query || (ref.Value.In == "" && ac.UseParam):
 		loc = query
 		key = ac.ParamName
 		ac.ParamName = ""
-	case ref.Value.In == cookie || (ref.Value.In == "" && ac.CookieName != ""):
+		ac.UseParam = false
+	case ref.Value.In == cookie || (ref.Value.In == "" && ac.UseCookie):
 		loc = cookie
 		key = ac.CookieName
 		ac.CookieName = ""
+		ac.UseCookie = false
 	}
 
 	ref.Value.WithName(key).WithIn(loc).WithType(apiKey)
@@ -149,10 +155,13 @@ func (s *OAS) extractApiKeySchemeTo(ac *apidef.AuthConfig, name string) {
 	switch ref.Value.In {
 	case header:
 		ac.AuthHeaderName = ref.Value.Name
+		ac.DisableHeader = false
 	case query:
 		ac.ParamName = ref.Value.Name
+		ac.UseParam = true
 	case cookie:
 		ac.CookieName = ref.Value.Name
+		ac.UseCookie = true
 	}
 }
 
