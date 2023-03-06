@@ -85,8 +85,8 @@ require (
 	github.com/xeipuuv/gojsonschema v1.2.0
 	github.com/xenolf/lego v0.3.2-0.20170618175828-28ead50ff1ca // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
-	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
-	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
+	golang.org/x/net v0.7.0
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/grpc v1.29.1
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
